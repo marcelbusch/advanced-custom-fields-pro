@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to process'
+        description: 'Tag to process (e.g. v6.8.0.1)'
         required: true
 
 jobs:
@@ -29,8 +29,8 @@ jobs:
       - name: Clone and checkout tag
         run: |
           TAG="${{ steps.tag.outputs.tag }}"
-          git clone --no-checkout https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git .
-          git checkout "tags/${TAG}" -b "work-${TAG}"
+          git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git .
+          git checkout "${TAG}"
 
       - name: Check if composer.json already exists
         id: check
@@ -45,11 +45,14 @@ jobs:
         if: steps.check.outputs.exists == 'false'
         run: |
           TAG="${{ steps.tag.outputs.tag }}"
+          # Strip leading v for version string
+          VERSION="${TAG#v}"
 
-          cat > composer.json << 'EOF'
+          cat > composer.json << EOF
           {
             "name": "marcelbusch/advanced-custom-fields-pro",
             "description": "Advanced Custom Fields PRO",
+            "version": "${VERSION}",
             "type": "wordpress-plugin",
             "license": "GPL-2.0-or-later",
             "require": {
