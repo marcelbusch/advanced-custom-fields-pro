@@ -1,16 +1,14 @@
 name: Add composer.json to releases
 
 on:
-  # Trigger when a new tag is pushed (synced from upstream)
   push:
     tags:
       - '*'
-  # Allow manual trigger
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to process (leave empty to process latest tag)'
-        required: false
+        description: 'Tag to process'
+        required: true
 
 jobs:
   add-composer-json:
@@ -28,12 +26,11 @@ jobs:
             echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Checkout tag
-        uses: actions/checkout@v4
-        with:
-          ref: refs/tags/${{ steps.tag.outputs.tag }}
-          fetch-depth: 0
-          fetch-tags: true
+      - name: Clone and checkout tag
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          git clone --no-checkout https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git .
+          git checkout "tags/${TAG}" -b "work-${TAG}"
 
       - name: Check if composer.json already exists
         id: check
@@ -44,18 +41,12 @@ jobs:
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Extract version from acf.php
+      - name: Create composer.json and update tag
         if: steps.check.outputs.exists == 'false'
-        id: version
         run: |
-          VERSION=$(grep -oP 'Version:\s*\K[\d.]+' acf.php | head -1)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Detected ACF version: $VERSION"
+          TAG="${{ steps.tag.outputs.tag }}"
 
-      - name: Create composer.json
-        if: steps.check.outputs.exists == 'false'
-        run: |
-          cat > composer.json << 'COMPOSER'
+          cat > composer.json << 'EOF'
           {
             "name": "marcelbusch/advanced-custom-fields-pro",
             "description": "Advanced Custom Fields PRO",
@@ -66,18 +57,12 @@ jobs:
               "composer/installers": "^1.0 || ^2.0"
             }
           }
-          COMPOSER
-          echo "Created composer.json"
+          EOF
 
-      - name: Commit and update tag
-        if: steps.check.outputs.exists == 'false'
-        run: |
-          TAG="${{ steps.tag.outputs.tag }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add composer.json
           git commit -m "Add composer.json for ${TAG}"
-          # Delete and recreate the tag to include composer.json
           git tag -d "${TAG}"
           git tag "${TAG}"
           git push origin "${TAG}" --force
