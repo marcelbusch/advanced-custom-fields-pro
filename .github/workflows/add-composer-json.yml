@@ -31,7 +31,9 @@ jobs:
       - name: Checkout tag
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.tag.outputs.tag }}
+          ref: refs/tags/${{ steps.tag.outputs.tag }}
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Check if composer.json already exists
         id: check
