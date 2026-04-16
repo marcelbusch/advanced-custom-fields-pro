@@ -1,0 +1,81 @@
+name: Add composer.json to releases
+
+on:
+  # Trigger when a new tag is pushed (synced from upstream)
+  push:
+    tags:
+      - '*'
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to process (leave empty to process latest tag)'
+        required: false
+
+jobs:
+  add-composer-json:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+
+      - name: Check if composer.json already exists
+        id: check
+        run: |
+          if [ -f composer.json ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Extract version from acf.php
+        if: steps.check.outputs.exists == 'false'
+        id: version
+        run: |
+          VERSION=$(grep -oP 'Version:\s*\K[\d.]+' acf.php | head -1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected ACF version: $VERSION"
+
+      - name: Create composer.json
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          cat > composer.json << 'COMPOSER'
+          {
+            "name": "marcelbusch/advanced-custom-fields-pro",
+            "description": "Advanced Custom Fields PRO",
+            "type": "wordpress-plugin",
+            "license": "GPL-2.0-or-later",
+            "require": {
+              "php": ">=7.4",
+              "composer/installers": "^1.0 || ^2.0"
+            }
+          }
+          COMPOSER
+          echo "Created composer.json"
+
+      - name: Commit and update tag
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add composer.json
+          git commit -m "Add composer.json for ${TAG}"
+          # Delete and recreate the tag to include composer.json
+          git tag -d "${TAG}"
+          git tag "${TAG}"
+          git push origin "${TAG}" --force
