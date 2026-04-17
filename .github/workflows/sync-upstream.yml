@@ -31,8 +31,12 @@ jobs:
           ORIGIN_TAGS=$(git tag -l --sort=-v:refname)
 
           for tag in $(git ls-remote --tags upstream | grep -oP 'refs/tags/\K[^\^]+$' | sort -V); do
-            if ! git ls-remote --tags origin | grep -q "refs/tags/${tag}$"; then
+            upstream_commit=$(git ls-remote --tags upstream | grep "refs/tags/${tag}$" | awk '{print $1}')
+            origin_commit=$(git ls-remote --tags origin | grep "refs/tags/${tag}$" | awk '{print $1}')
+            if [ -z "$origin_commit" ]; then
               echo "New tag found: ${tag}"
               git push origin "refs/tags/${tag}:refs/tags/${tag}"
+            elif [ "$upstream_commit" != "$origin_commit" ]; then
+              echo "Tag ${tag} exists with different commit on origin; skipping to avoid clobbering."
             fi
           done
