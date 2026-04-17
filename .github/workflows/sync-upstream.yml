@@ -2,8 +2,8 @@ name: Sync upstream tags
 
 on:
   schedule:
-    # Check for new upstream tags daily at 6am UTC
-    - cron: '0 6 * * *'
+    # Check for new upstream tags weekly on Monday at 6am UTC
+    - cron: '0 6 * * 1'
   workflow_dispatch:
 
 jobs:
